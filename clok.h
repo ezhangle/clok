@@ -25,21 +25,21 @@
 #define clok_h
 #include <stddef.h>
 
+#ifndef CK_SHOULD_PACK
+#  define CK_SHOULD_PACK (0)
+#endif
+
 typedef struct ck_Pool  ck_Pool;
 typedef struct ck_CbSet ck_CbSet;
 typedef struct ck_Config ck_Config;
-
-struct ck_CbSet
-{
-    void (*expire)( ck_Pool* pool, void* block );
-    void (*preserve)( ck_Pool* pool, void* block );
-};
 
 struct ck_Config
 {
     size_t   quota;
     void*    (*alloc)( void* context, size_t size );
     void     (*free)( void* context, void* alloc );
+    void     (*expire)( void* context, void* alloc );
+    void     (*preserve)( void* context, void* alloc, ck_Pool* pool );
     void*    context;
 };
 
@@ -50,20 +50,28 @@ void
 ck_freePool( ck_Pool* pool );
 
 void*
-ck_allocSlim( ck_Pool* pool, unsigned size, void*    owner );
+ck_allocSlim( ck_Pool* pool, size_t size, void* owner );
 
 void* 
-ck_allocFat( ck_Pool* pool, unsigned size,
-             void* owner, ck_CbSet const* cbset );
+ck_allocFat( ck_Pool* pool, size_t size, void* owner );
 
-void*
+void
 ck_ref( ck_Pool* pool, void* alloc, void* owner );
+
+void
+ck_unroot( ck_Pool* pool, void* alloc, void* owner );
+
+void
+ck_cycle( ck_Pool* pool );
 
 void
 ck_tick( ck_Pool* pool );
 
 void
 ck_step( ck_Pool* pool );
+
+void
+ck_reserve( ck_Pool* pool, size_t amount );
 
 size_t
 ck_avail( ck_Pool* pool );

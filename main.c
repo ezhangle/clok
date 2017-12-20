@@ -2,55 +2,75 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <time.h>
 
 // just a testing ground for the GC...
 // and not a very good one; having a
 // hard time coming up with test cases
 
-typedef struct List List;
-typedef struct Root Root;
-typedef struct Int  Int;
+typedef enum   Type   Type;
+typedef struct Object Object;
+typedef struct List   List;
+typedef struct Root   Root;
+typedef struct Int    Int;
+
+enum Type
+{
+    TYPE_INT,
+    TYPE_LIST,
+    TYPE_ROOT
+};
+
+struct Object
+{
+    Type type;
+};
 
 struct Int
 {
-    int val;
+    Object obj;
+    int    val;
 };
 
 struct List
 {
-    void* value;
-    List* next;
+    Object obj;
+    void*  value;
+    List*  next;
 };
 
 struct Root
 {
-    Int*  int1;
-    List* list1;
-    List* list2;
-    List* list3;
-    List* list4;
+    Object obj;
+    Int*   int1;
+    List*  list1;
+    List*  list2;
+    List*  list3;
+    List*  list4;
 };
 
 
 
 Int*  intMake( ck_Pool* pool, void* owner, int val );
-void  intExpire( ck_Pool* pool, void* val );
-void  intPreserve( ck_Pool* pool, void* val );
+void  intExpire( Int* val );
+void  intPreserve( ck_Pool* pool, Int* val );
 List* listMake( ck_Pool* pool, void* owner, void* val, List* next );
-void  listExpire( ck_Pool* pool, void* val );
-void  listPreserve( ck_Pool* pool, void* val );
+void  listExpire( List* val );
+void  listPreserve( ck_Pool* pool, List* val );
 Root* rootMake( ck_Pool* pool );
-void  rootExpire( ck_Pool* pool, void* val );
-void  rootPreserve( ck_Pool* pool, void* val );
+void  rootExpire( Root* val );
+void  rootPreserve( ck_Pool* pool, Root* val );
 void* dAlloc( void* context, size_t size );
 void  dFree( void* context, void* alloc );
+void dExpire( void* context, void* alloc );
+void dPreserve( void* context, void* alloc, ck_Pool* pool );
 
-
-ck_CbSet intCallbacks  = { &intExpire,  &intPreserve };
-ck_CbSet listCallbacks = { &listExpire, &listPreserve };
-ck_CbSet rootCallbacks = { &rootExpire, &rootPreserve };
-
-ck_Config config = { 1000000, &dAlloc, &dFree, NULL };
+ck_Config config = { .quota    = 1000000,
+                     .alloc    = &dAlloc,
+                     .free     = &dFree,
+                     .expire   = &dExpire,
+                     .preserve = &dPreserve,
+                     .context  = NULL };
 
 int main( void )
 {
@@ -66,10 +86,15 @@ int main( void )
         root->list2   = listMake( pool, root, root->int1, root->list1 );
         root->list1->next = root->list2;
         ck_ref( pool, root->list2, root->list1 );
-        ck_step( pool );
+        
+        clock_t tstart = clock();
+        ck_tick( pool );
+        clock_t tend   = clock();
+        unsigned usecs = (tend-tstart)*1000000000/CLOCKS_PER_SEC;
+        printf( "Tick Time = %uus\n", usecs );
     }
     
-    //ck_freePool( pool );
+    ck_freePool( pool );
 }
 
 void* dAlloc( void* context, size_t size )
@@ -82,11 +107,45 @@ void dFree( void* context, void* alloc )
     return free(alloc);
 }
 
+void dExpire( void* context, void* alloc )
+{
+    Object* obj = alloc;
+    switch( obj->type )
+    {
+        case TYPE_INT:
+            intExpire( (Int*) obj );
+        break;
+        case TYPE_LIST:
+            listExpire( (List*) obj );
+        break;
+        case TYPE_ROOT:
+            rootExpire( (Root*) obj );
+        break;
+    }
+};
+
+void dPreserve( void* context, void* alloc, ck_Pool* pool )
+{
+    Object* obj = alloc;
+    switch( obj->type )
+    {
+        case TYPE_INT:
+            intPreserve( pool, (Int*) obj );
+        break;
+        case TYPE_LIST:
+            listPreserve( pool, (List*) obj );
+        break;
+        case TYPE_ROOT:
+            rootPreserve( pool, (Root*) obj );
+        break;
+    }
+}
+
 Int* intMake( ck_Pool* pool, void* owner, int val )
 {
-    Int* i = ck_allocFat( pool, sizeof(*i),
-                            owner, &intCallbacks );
+    Int* i = ck_allocFat( pool, sizeof(*i), owner );
     assert(i);
+    i->obj.type = TYPE_INT;
     i->val = val;
     
     printf( "Making Int 0x%llx\n", (unsigned long long) i );
@@ -94,21 +153,21 @@ Int* intMake( ck_Pool* pool, void* owner, int val )
 }
 
 
-void intExpire( ck_Pool* pool, void* val )
+void intExpire( Int* val )
 {
     printf( "Expiring Int 0x%llx\n", (unsigned long long) val );
 }
 
-void intPreserve( ck_Pool* pool, void* val )
+void intPreserve( ck_Pool* pool, Int* val )
 {
     printf( "Preserved Int 0x%llx\n", (unsigned long long) val );
 }
 
 List* listMake( ck_Pool* pool, void* owner, void* val, List* next )
 {
-    List* list = ck_allocFat( pool, sizeof(*list),
-                                owner, &listCallbacks );
+    List* list = ck_allocFat( pool, sizeof(*list), owner );
     assert(list);
+    list->obj.type = TYPE_LIST;
     list->value = val;
     list->next  = next;
     ck_ref( pool, val, list );
@@ -118,12 +177,12 @@ List* listMake( ck_Pool* pool, void* owner, void* val, List* next )
     return list;
 }
 
-void listExpire( ck_Pool* pool, void* val )
+void listExpire( List* val )
 {
     printf( "Expiring List 0x%llx\n", (unsigned long long) val );
 }
 
-void listPreserve( ck_Pool* pool, void* val )
+void listPreserve( ck_Pool* pool, List* val )
 {
     List* list = val;
     ck_ref( pool, list->value, list );
@@ -135,9 +194,9 @@ void listPreserve( ck_Pool* pool, void* val )
 
 Root* rootMake( ck_Pool* pool )
 {
-    Root* root = ck_allocFat( pool, sizeof(*root),
-                               NULL, &rootCallbacks );
+    Root* root = ck_allocFat( pool, sizeof(*root), NULL );
     assert(root);
+    root->obj.type = TYPE_ROOT;
     root->list1 = NULL;
     root->list2 = NULL;
     root->list3 = NULL; 
@@ -147,12 +206,12 @@ Root* rootMake( ck_Pool* pool )
     return root;
 }
 
-void rootExpire( ck_Pool* pool, void* val )
+void rootExpire( Root* val )
 {
     printf( "Expiring Root 0x%llx\n", (unsigned long long) val );
 }
 
-void rootPreserve( ck_Pool* pool, void* val )
+void rootPreserve( ck_Pool* pool, Root* val )
 {
     Root* root = val;
     ck_ref( pool, root->int1, root );

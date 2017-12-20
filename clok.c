@@ -101,6 +101,11 @@ struct ck_Pool
     size_t used;
 };
 
+
+#if CK_SHOULD_PACK
+#  pragma pack( push, 1 )
+#endif
+
 struct BlockSlim
 {
     BlockSlim*    eNext;
@@ -112,22 +117,24 @@ struct BlockSlim
 };
 
 struct BlockFat
-{
-    ck_CbSet const* cbSet;
-    
+{    
     // preservation scheduling
     BlockFat*   pNext;
     BlockFat**  pRef;
     Slot        pSlot;
     
     // cycle detection
-    BlockFat*   owner;
     uchar       cycleCD;
+    BlockFat*   owner;
     
     BlockSlim   slim;
     
     // data follows
 };
+
+#if CK_SHOULD_PACK
+#  pragma pack( pop )
+#endif
 
 
 // helper prototypes
@@ -259,7 +266,7 @@ ck_freePool( ck_Pool* pool )
 }
 
 void*
-ck_allocSlim( ck_Pool* pool, unsigned size, void* owner )
+ck_allocSlim( ck_Pool* pool, size_t size, void* owner )
 {
     Size cSize = compressSize( size );
     if( size > decompressSize( cSize ) )
@@ -294,8 +301,7 @@ ck_allocSlim( ck_Pool* pool, unsigned size, void* owner )
 }
 
 void* 
-ck_allocFat( ck_Pool* pool, unsigned size,
-             void* owner, ck_CbSet const* cbset )
+ck_allocFat( ck_Pool* pool, size_t size, void* owner )
 {
     Size cSize = compressSize( size );
     if( size > decompressSize( cSize ) )
@@ -311,8 +317,6 @@ ck_allocFat( ck_Pool* pool, unsigned size,
              cSize,
              true,
              (owner == NULL ) );
-    
-    block->cbSet  = cbset;
     
     // if owner non-NULL then block is not root and
     // needs it's expiration slot set
@@ -333,22 +337,22 @@ ck_allocFat( ck_Pool* pool, unsigned size,
     return fatToPtr( block );
 }
 
-void*
+void
 ck_ref( ck_Pool* pool, void* alloc, void* owner )
 {
     if( alloc == NULL || alloc == owner )
-        return NULL;
+        return;
     
     BlockSlim* block = ptrToSlim( alloc );
     if( isRoot( block ) )
-        return NULL;
+        return;
     
     eExtract( block );
     
     if( !owner )
     {
         toRoot( pool, block );
-        return block;
+        return;
     }
     
     BlockFat* oBlock = ptrToFat( owner );
@@ -370,8 +374,29 @@ ck_ref( ck_Pool* pool, void* alloc, void* owner )
     }
     
     eInsert( pool, block );
+}
+
+void
+ck_unroot( ck_Pool* pool, void* alloc, void* owner )
+{
+    if( alloc == NULL || alloc == owner || owner == NULL )
+        return;
     
-    return alloc;
+    BlockSlim* block = ptrToSlim( alloc );
+    if( !isRoot( block ) )
+        return;
+    
+    eExtract( block );
+    setOwner( block, ptrToFat( owner ) );
+    eInsert( pool, block );
+}
+
+void
+ck_cycle( ck_Pool* pool )
+{
+    uint ticks = NUM_SLOTS;
+    while( ticks-- )
+        ck_tick( pool );
 }
 
 void
@@ -404,6 +429,14 @@ ck_step( ck_Pool* pool )
         doExpire( pool, *eSlot );
     else
         pool->clock++;
+}
+
+void
+ck_reserve( ck_Pool* pool, size_t amount )
+{
+    uint ticks = NUM_SLOTS;
+    while( pool->used + amount > pool->config.quota && ticks-- )
+        ck_tick( pool );
 }
 
 size_t
@@ -634,9 +667,11 @@ doExpire( ck_Pool* pool, BlockSlim* block )
     {
         BlockFat* fat = slimToFat( block );
         pExtract( fat );
-        if( fat->cbSet && fat->cbSet->expire )
-            fat->cbSet->expire( pool, fatToPtr( fat ) );
     }
+    
+    
+    if( pool->config.expire )
+        pool->config.expire( pool->config.context, slimToPtr( block ) );
     
     pool->used -= decompressSize( getSize( block ) );
     if( isFat( block ) )
@@ -686,8 +721,8 @@ doPreserve( ck_Pool* pool, BlockFat* block )
     }
     
     
-    if( block->cbSet && block->cbSet->preserve )
-        block->cbSet->preserve( pool, fatToPtr(block) );
+    if( pool->config.preserve )
+        pool->config.preserve( pool->config.context, fatToPtr(block), pool );
 }
 
 static inline void

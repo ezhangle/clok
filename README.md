@@ -98,7 +98,7 @@ assignments are prominent (a lot of situations) Clok's ref barrier is
 likely much cheaper than the occumulative RC manipulations.
 
 ## Features
-    - Fine grained control of GC delay
-    - Cycle detection
-    - Simple implementatio
-    - Platform independent
+- Fine grained control of GC delay
+- Cycle detection
+- Simple implementatio
+- Platform independent

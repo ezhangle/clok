@@ -31,7 +31,6 @@
 
 #define NUM_SLOTS             (UCHAR_MAX)
 #define RAND_COUNT            (128)
-#define CYCLE_DETECT_INTERVAL (4)
 
 // random number array used for quick randomization
 static const unsigned RAND_NUMS[RAND_COUNT] =
@@ -356,15 +355,6 @@ ck_ref( ck_Pool* pool, void* alloc, void* owner )
     }
     
     BlockFat* oBlock = ptrToFat( owner );
-    if( isFat( block ) )
-    {
-        // if referenced by any non-owner block
-        // then we know it isn't in an orphan cycle
-        BlockFat* fat = slimToFat(block);
-        if( fat->owner != oBlock )
-            fat->cycleCD = CYCLE_DETECT_INTERVAL;
-    }
-        
     if( shouldRef( pool, oBlock, block ) )
     {
         setOwner( block, oBlock );
@@ -589,7 +579,11 @@ setOwner( BlockSlim* block, BlockFat* owner )
     if( isFat( block ) )
     {
         BlockFat* fat = slimToFat( block );
-        fat->owner    = owner;
+        if( fat->owner != owner )
+        {
+            fat->owner    = owner;
+            fat->cycleCD  = CK_CYCLE_DETECT_COUNTDOWN;
+        }
     }
 }
 
@@ -717,7 +711,7 @@ doPreserve( ck_Pool* pool, BlockFat* block )
             } while( oIter != block );
         }
         
-        block->cycleCD = CYCLE_DETECT_INTERVAL;
+        block->cycleCD = CK_CYCLE_DETECT_COUNTDOWN;
     }
     
     

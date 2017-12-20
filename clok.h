@@ -35,6 +35,15 @@
 #  define CK_SHOULD_PACK (0)
 #endif
 
+/* this determines the cycle detection initial counter
+ * value for each allocation.  after the specified number
+ * of preservations during which the same reference
+ * maintains control of an allocation, the next preservation
+ * will perform run a cycle detection routine to make sure
+ * the block isn't a part of an orphan cycle.
+ */
+#define CK_CYCLE_DETECT_COUNTDOWN (4)
+
 typedef struct ck_Pool  ck_Pool;
 typedef struct ck_CbSet ck_CbSet;
 typedef struct ck_Config ck_Config;

@@ -100,5 +100,5 @@ likely much cheaper than the occumulative RC manipulations.
 ## Features
 - Fine grained control of GC delay
 - Cycle detection
-- Simple implementatio
+- Simple implementation
 - Platform independent

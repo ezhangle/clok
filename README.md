@@ -1,5 +1,5 @@
 # Clok: An Unconventional Garbage Collector
-An unconventional garbage collector based on the idea of expiring
+An unconventional garbage collector based on the idea of expiring/
 timed  references. The basic idea is the basic idea is that an object
 reference lasts only a certain period of 'time' (gc ticks) after which
 the object will expire if the reference isn't refreshed.  The idea

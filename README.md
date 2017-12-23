@@ -79,6 +79,9 @@ the allocation 'owner' then the allocation is considered to be a root,
 and will never expire unless the pool is freed or the 'ck_unroot'
 function is used to deroot it.
 
+    void* ck_allocSlim( ck_Pool* pool, size_t size, void* owner );
+    void* ck_allocFat( ck_Pool* pool, size_t size, void* owner );
+
 The 'ck_ref' function is how we tell Clok that one object 'owner'
 has obtained a reference to another 'alloc'.  Clok references have
 a time limit, so after the initial ref (after obtaining a reference)
@@ -92,11 +95,14 @@ local reference assignment within a single object is free.  Calling
 preventing it from being freed unless the pool itself is freed or
 the 'ck_unroot' function is used to deroot it.
 
+    void ck_ref( ck_Pool* pool, void* alloc, void* owner );
+
 The 'ck_unroot' function can be called on root allocations to deroot
 them.  The 'owner' parameter should be the new initial referencer;
 a referencing object to keep the newly derooted object from being
 collected immediately.
 
+    void ck_unroot( ck_Pool* pool, void* alloc, void* owner );
 
 Clok provides three API functions for invoking collection at different
 levels of granularity.  The 'ck_cycle' function performs the most work,
@@ -114,17 +120,28 @@ callback, calls a preservation callback, or increments the clock.  The
 delay for either callback depends on the user; but should be kept
 minimal.  The delay for an increment is just in int addition.
 
+    void ck_cycle( ck_Pool* pool );
+    void ck_tick( ck_Pool* pool );
+    void ck_step( ck_Pool* pool );
+
 Clok also provides a more general 'ck_reserve' function; this
 will perform some number of ticks until either a full cycle has
 been advanced or the amount of available quota memory is greater
 than the specified amount.
 
+    void ck_reserve( ck_Pool* pool, size_t amount );
+
 The 'ck_avail' and 'ck_used' functions are accessors for the amount
 of quota room left and the amount of currently allocated memory.
+
+    void   ck_reserve( ck_Pool* pool, size_t amount );
+    size_t ck_avail( ck_Pool* pool );
 
 Once an allocated pool is no longer needed a call to 'ck_freePool'
 will deallocate the pool itself and all the allocations it manages;
 so if any of its objects are still in use the pool shouldn't be freed.
+
+    void ck_freePool( ck_Pool* pool );
 
 
 ## Note

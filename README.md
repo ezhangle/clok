@@ -61,7 +61,7 @@ that passing a non-clok allocation to any of the API functions has
 undefined and likely catestrophic behavior.
 
 The 'context' field of the config is a user parameter that'll be
-passed into all the contexts, allows for the user to maintain state
+passed into all the callbacks, allows for the user to maintain state
 without any globals.
 
 

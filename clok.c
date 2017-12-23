@@ -325,6 +325,10 @@ ck_allocFat( ck_Pool* pool, size_t size, void* owner )
     // needs it's expiration slot set
     if( owner )
     {
+        // owner will be changed in 'setOwner' we just
+        // initialize to NULL here to prevent an 'if'
+        // from depending on an uninitialized value
+        block->owner = NULL;
         setOwner( fatToSlim(block), ptrToFat( owner ) );
         eInsert( pool, fatToSlim(block) );
     }

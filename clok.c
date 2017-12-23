@@ -232,7 +232,9 @@ setPreserveSlot( ck_Pool* pool, BlockFat* block );
 ck_Pool*
 ck_makePool( ck_Config const* config )
 {
-    ck_Pool* pool = config->alloc( config->context, sizeof(*pool) );
+    ck_Pool* pool = config->alloc( config->context,
+                                   NULL,
+                                   sizeof(*pool) );
     pool->config  = *config;
     pool->roots   = NULL;
     pool->orphans = NULL;
@@ -261,7 +263,9 @@ ck_freePool( ck_Pool* pool )
     while( pool->roots )
         doExpire( pool, pool->roots );
     
-    pool->config.free( pool->config.context, pool );
+    pool->config.alloc( pool->config.context,
+                        pool,
+                        0 );
 }
 
 void*
@@ -455,7 +459,7 @@ allocRaw( ck_Pool* pool, size_t size )
     if( pool->used + size > pool->config.quota )
         return NULL;
     
-    return pool->config.alloc( pool->config.context, size );
+    return pool->config.alloc( pool->config.context, NULL, size );
 }
 
 static inline BlockSlim*
@@ -671,12 +675,16 @@ doExpire( ck_Pool* pool, BlockSlim* block )
     if( isFat( block ) )
     {
         pool->used -= sizeof(BlockFat);
-        pool->config.free( pool->config.context, slimToFat(block) );
+        pool->config.alloc( pool->config.context,
+                            slimToFat(block),
+                            0 );
     }
     else
     {
         pool->used -= sizeof(BlockSlim);
-        pool->config.free( pool->config.context, block );
+        pool->config.alloc( pool->config.context,
+                            block,
+                            0 );
     }
 }
 

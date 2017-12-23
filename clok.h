@@ -60,15 +60,16 @@ struct ck_Config
      * Clok is purely a garbage collector, it doesn't
      * do other memory management tasks (like defrag)
      * so the provided allocator is expected to do all
-     * the low level stuff; a wrapper around malloc is
+     * the low level stuff; a wrapper around realloc is
      * generally sufficient.  The 'context' parameter
      * just passes the config's 'context' field, it's
-     * a means of supplying user data to the callbacks
+     * a means of supplying user data to the callbacks;
+     * the allocator should behave like the standard
+     * 'realloc' function, equivalent to malloc if
+     * 'old' is NULL, and equivalent to 'free' if 'old'
+     * is non-null and 'size' is zero.
      */
-    void* (*alloc)( void* context, size_t size );
-    
-    /* memory free callback, the counterpart to 'alloc' */
-    void (*free)( void* context, void* alloc );
+    void* (*alloc)( void* context, void* old, size_t size );
     
     /* expiration callback, this is called whenever an
      * allocation is about to be freed by the GC; it allows

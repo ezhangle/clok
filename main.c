@@ -60,14 +60,13 @@ void  listPreserve( ck_Pool* pool, List* val );
 Root* rootMake( ck_Pool* pool );
 void  rootExpire( Root* val );
 void  rootPreserve( ck_Pool* pool, Root* val );
-void* dAlloc( void* context, size_t size );
+void* dAlloc( void* context, void* old, size_t size );
 void  dFree( void* context, void* alloc );
 void dExpire( void* context, void* alloc );
 void dPreserve( void* context, void* alloc, ck_Pool* pool );
 
 ck_Config config = { .quota    = 1000000,
                      .alloc    = &dAlloc,
-                     .free     = &dFree,
                      .expire   = &dExpire,
                      .preserve = &dPreserve,
                      .context  = NULL };
@@ -97,14 +96,9 @@ int main( void )
     ck_freePool( pool );
 }
 
-void* dAlloc( void* context, size_t size )
+void* dAlloc( void* context, void* old, size_t size )
 {
-    return malloc(size);
-}
-
-void dFree( void* context, void* alloc )
-{
-    return free(alloc);
+    return realloc( old, size );
 }
 
 void dExpire( void* context, void* alloc )

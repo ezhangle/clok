@@ -9,7 +9,12 @@ itself; this is more reasonable, the callback is really just a generic
 representation for a reference scanner.
 
 ## Usage
-The Clok API is pretty minimal; basically you'll create a memory
+The Clok API is pretty minimal.  The only header file needed is
+'clok.h' and the implementation is all in 'clok.c'; the 'main.c'
+file is basically just a playground I used for basic testing and
+isn't really a part of Clok.
+
+To get started you'll need to create a memory
 pool with the 'ck_makePool' function, passing it a config struct
 to specify specific parameters:
 
